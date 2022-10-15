@@ -1,2 +1,5 @@
 # Ignore all credentials
 .credentials
+
+# Ignore Draf
+.draft

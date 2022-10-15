@@ -7,16 +7,17 @@ MAKEFLAGS += --no-print-directory
 # SANDBOX
 ##############################################################################
 
-argocd: argocd/Chart.yaml ## Install argocd
-	kubectl create namespace argocd --dry-run=client --output=yaml | kubectl apply -f -
+argocd: argocd/Chart.yaml 
+	kubectl create namespace argocd > /dev/null || true
 	cd argocd && helm dependency update
-	cd argocd && ./apply.sh
+	cd argocd && ./cmd.sh deploy
 
 vault: 
+	kubectl create namespace vault > /dev/null || true
 	cd vault && helm dependency update
-	cd vault && ./apply.sh
+	cd vault && ./cmd.sh deploy
 
 stack:
-	cd stack && ./apply.sh
+	cd stack && ./cmd.sh deploy
 
-deploy: argocd vault
+deploy: argocd vault stack

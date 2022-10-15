@@ -1,0 +1,24 @@
+server:
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      hajimari.io/appName: Vault
+      hajimari.io/icon: database-lock
+    spec:
+      ingressClassName: nginx
+      rules:
+        - host: &host vault.127-0-0-1.nip.io
+          http:
+            paths:
+              - backend:
+                  service:
+                    name: vault
+                    port:
+                      number: 8200
+                path: /
+                pathType: Prefix
+      tls:
+        - hosts:
+            - *host
+          secretName: vault-tls-certificate

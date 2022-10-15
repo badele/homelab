@@ -12,6 +12,10 @@ remove_secret_files() {
 }
 trap "remove_secret_files" EXIT
 
+is_unsealed() {
+    kubectl -n ${APPNAME} exec -ti vault-0 -- vault status -format=json | jq .sealed | grep false > /dev/null
+}
+
 install_vault() {
     # Allready installed
     if kubectl get namespaces ${APPNAME} > /dev/null; then
@@ -24,7 +28,6 @@ install_vault() {
     fi
 
     # Install application
-    kubectl create namespace ${APPNAME} --dry-run=client --output=yaml | kubectl apply -f -
     helm template \
         --include-crds \
         --namespace ${APPNAME} \
@@ -48,7 +51,7 @@ install_vault() {
 
     # TODO: define keys in variables for hidden on error bash script
     IDX=0
-    COMMANDSECRETS="kubectl -n ${APPNAME} create secret generic vault-unseal"
+    COMMANDSECRETS="kubectl -n ${APPNAME} create secret generic vault-unseal-keys"
 
     for key in $KEYS; do
         IDX=$((IDX+1))
@@ -64,11 +67,27 @@ install_vault() {
 }
 
 unseal_vault() {
+    if is_unsealed ; then
+        exit 0
+    fi
+
     for idx in $(seq ${NBKEYS}); do
-        KEY=$(kubectl -n ${APPNAME} get secret vault-unseal -o jsonpath="{.data.unseal-${idx}}" | base64 --decode)
-        kubectl -n ${APPNAME} exec -ti vault-0 -- vault operator unseal "${KEY}"
+        KEY=$(kubectl -n ${APPNAME} get secret vault-unseal-keys -o jsonpath="{.data.unseal-${idx}}" | base64 --decode)
+        kubectl -n ${APPNAME} exec -ti vault-0 -- vault operator unseal "${KEY}" > /dev/null
     done
+
+    if ! is_unsealed ; then
+        echo "Vaul can't unseal"
+    fi
 }
 
-install_vault
-unseal_vault
+deploy() {
+    install_vault
+    unseal_vault
+}
+
+credential() {
+    echo $(kubectl -n vault get secret vault-unseal-keys -o jsonpath="{.data.root-token}" | base64 -d)
+}
+
+$@
